@@ -75,6 +75,8 @@ public class audiovideocombiner extends ActionBarActivity {
         }
 
         MediaFormat videoFormat = mediaVideoExtractor.getTrackFormat(0);
+        mediaVideoExtractor.selectTrack(0);
+
         MediaExtractor mediaAudioExtractor = new MediaExtractor();
         try
         {
@@ -85,12 +87,15 @@ public class audiovideocombiner extends ActionBarActivity {
         }
 
         MediaFormat audioFormat = mediaAudioExtractor.getTrackFormat(0);
+        mediaAudioExtractor.selectTrack(0);
 
-        int audioTrackIndex = muxer.addTrack(audioFormat);
         int videoTrackIndex = muxer.addTrack(videoFormat);
+        int audioTrackIndex = muxer.addTrack(audioFormat);
+
         ByteBuffer inputBuffer = ByteBuffer.allocate(1000000);
         boolean finished = false;
-        boolean isAudioSample = true;
+        boolean isAudioSample = false;
+        int offset = 0;
         BufferInfo bufferInfo = new BufferInfo();
 
         muxer.start();
@@ -98,23 +103,31 @@ public class audiovideocombiner extends ActionBarActivity {
 
             if (isAudioSample)
             {
-                bufferInfo.offset = 0;
-                bufferInfo.size = mediaAudioExtractor.readSampleData(inputBuffer, 0);
+                bufferInfo.offset = offset;
+                bufferInfo.size = mediaAudioExtractor.readSampleData(inputBuffer, offset);
                 bufferInfo.flags = mediaAudioExtractor.getSampleFlags();
                 bufferInfo.presentationTimeUs = mediaAudioExtractor.getSampleTime();
+                mediaAudioExtractor.advance();
             }
             else
             {
-                bufferInfo.offset = 0;
-                bufferInfo.size = mediaVideoExtractor.readSampleData(inputBuffer, 0);
+                bufferInfo.offset = offset;
+                bufferInfo.size = mediaVideoExtractor.readSampleData(inputBuffer, offset);
                 bufferInfo.flags = mediaVideoExtractor.getSampleFlags();
                 bufferInfo.presentationTimeUs = mediaVideoExtractor.getSampleTime();
+                mediaVideoExtractor.advance();
             }
 
             if (bufferInfo.size < 0)
             {
                 finished = true;
                 bufferInfo.size = 0;
+
+                mediaAudioExtractor.release();
+                mediaVideoExtractor.release();
+
+                mediaAudioExtractor = null;
+                mediaVideoExtractor = null;
             }
 
             if (!finished) {
@@ -136,7 +149,8 @@ public class audiovideocombiner extends ActionBarActivity {
         } catch (RuntimeException e) {
             e.printStackTrace();
             return false;
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             e.printStackTrace();
             return false;
         }
